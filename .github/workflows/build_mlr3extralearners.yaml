@@ -1,0 +1,44 @@
+# Integration tests for installing git packages
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+name: test-rix-git_pkgs
+
+permissions:
+  contents: read
+
+jobs:
+  devtools:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+
+      - uses: cachix/cachix-action@v15
+        with:
+          name: rstats-on-nix
+          # If you chose signing key for write access
+          # signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
+          # If you chose API tokens for write access OR if you have a private cache
+          authToken: '${{ secrets.CACHIX_AUTH }}'
+
+      - name: Build default.nix with 2 git packages
+        run: |
+          nix-shell default.nix --run "Rscript -e \"devtools::load_all();rix('4.4.2', git_pkgs = list(list(package_name = 'scMisc', repo_url = 'https://github.com/mihem/scMisc/', commit = 'e2ebddcb779b935551f14216514c0429616fc91d'), list(package_name = 'housing', repo_url = 'https://github.com/rap4all/housing/', commit = '1c860959310b80e67c41f7bbdc3e84cef00df18e')), project_path = '.', overwrite = TRUE)\""
+
+      - name: Check generated default.nix
+        run: cat default.nix
+
+      - name: Build default.nix
+        run: nix-build
+
+      - name: Try running the shell
+        run: nix-shell --run "echo OK"
